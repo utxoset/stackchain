@@ -8,6 +8,7 @@
 # TODO lookup USD/BTC exchange rate at time of tweet to approximate sats stacked
 # TODO properly handle proxy blocks
 # TODO handle multi stacks
+# TODO OCR on included images to recognize stacked USD??
 
 import re
 import sys
