@@ -17,10 +17,9 @@ import time
 import requests
 import tweepy
 import argparse
-
-# simplistic pattern to recognize block height in tweet text - any sequence of 1-5 digits followed by whitespace
 from tweepy import Response
 
+# simplistic pattern to recognize block height in tweet text - any sequence of 1-5 digits followed by whitespace
 block_pattern = re.compile(r'(\d{1,5})\s+')
 
 # stack height and tweet id of the genesis block
