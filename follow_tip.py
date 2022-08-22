@@ -72,13 +72,23 @@ def parse_mentions(text, entities):
     return text, users
 
 
-def print_block_info(tweet_id, author_username, created_at, approx_block_height, txt, blocks, mentions):
-    """Print structured information about given block in .tsv format suitable for easy import into Google Sheets"""
-    print('{:d}\t{:s}\t{:d}\t{:d}\t{:s}\t{:s}\t{:s}'.format(tweet_id, author_username, created_at,
-                                                            approx_block_height, txt, str(blocks), str(mentions)))
+def quote_for_tsv(txt):
+    return txt.replace("\t", "\\t").replace("\n", "\\n")
 
 
-def get_stack_blocks(tweet_id: int, approx_block_height: int, seconds_per_request: int):
+def print_block_info(tweet_id, author_username, created_at, approx_block_height, full_text, txt, blocks, mentions):
+    """Print structured information about given block in .tsv format suitable for easy import into Google Sheets
+    :param full_text:
+    """
+    print('{:d}\t{:s}\t{:s}\t{:d}\t{:d}\t{:s}\t{:s}\t{:s}\t{:s}'.format(tweet_id, generic_tweet_url(tweet_id), author_username, created_at,
+                                                                  approx_block_height, txt, full_text, str(blocks),
+                                                                  str(mentions)))
+
+
+def get_stack_blocks(tweet_id: int, approx_block_height: int, stop_block_height, seconds_per_request: int):
+    if stop_block_height and approx_block_height < stop_block_height:
+        return
+
     time.sleep(seconds_per_request)  # manage to Twitter rate limit
     api_response = client.get_tweet(tweet_id,
                                     tweet_fields=["conversation_id", "author_id", "created_at", "referenced_tweets",
@@ -90,20 +100,25 @@ def get_stack_blocks(tweet_id: int, approx_block_height: int, seconds_per_reques
         return
 
     (txt, mentions) = parse_mentions(tweet.text, tweet.data["entities"])
-    txt = txt.replace("\t", "  ").replace("\n", "   ")
-    blocks = block_pattern.findall(txt)
+    block_candidates = [int(i) for i in block_pattern.findall(txt)]
+    blocks_filtered = sorted([i for i in block_candidates if approx_block_height >= i >= approx_block_height * .97])
+    if blocks_filtered and len(blocks_filtered) == 1 and approx_block_height != blocks_filtered[0]:
+        print('Reset block height @{:d}: {:s}'.format(approx_block_height, str(blocks_filtered)), file=sys.stderr)
+        approx_block_height = blocks_filtered[0]
 
     author_id = tweet.data["author_id"]
     author_username = [u.username for u in api_response.includes["users"] if str(u.id) == author_id][0]
     created_at = int(time.mktime(time.strptime(tweet.data["created_at"], "%Y-%m-%dT%H:%M:%S.000%z")))
 
-    print_block_info(tweet_id, author_username, created_at, approx_block_height, txt, blocks, mentions)
+    print_block_info(tweet_id, author_username, created_at, approx_block_height, quote_for_tsv(tweet.text),
+                     quote_for_tsv(txt), '{:s} :> {:s}'.format(str(block_candidates), str(blocks_filtered)), mentions)
 
     if tweet_id in block_glue:
         (prev_block_height, prev_block_id) = block_glue[tweet_id]
-        print("Using glue to followchain @{:d} to block {:d} @{:d}".format(tweet_id, prev_block_height, prev_block_id), file=sys.stderr)
+        print("Using glue to followchain @{:d} to block {:d} @{:d}".format(tweet_id, prev_block_height, prev_block_id),
+              file=sys.stderr)
 
-        get_stack_blocks(prev_block_id, prev_block_height, seconds_per_request)
+        get_stack_blocks(prev_block_id, prev_block_height, stop_block_height, seconds_per_request)
         return
 
     if tweet.referenced_tweets is None:
@@ -112,10 +127,10 @@ def get_stack_blocks(tweet_id: int, approx_block_height: int, seconds_per_reques
 
     replied_to = list(filter(lambda r: r.type == 'replied_to', tweet.referenced_tweets))
     if len(replied_to) > 1:
-        print("Unexpected backwards fork @{:s} ".format(replied_to))
+        print("Unexpected backwards fork @{:s} ".format(replied_to, file=sys.stderr))
     elif len(replied_to) == 1:
         prev_id = replied_to[0].id
-        get_stack_blocks(prev_id, approx_block_height - 1, seconds_per_request)
+        get_stack_blocks(prev_id, approx_block_height - 1, stop_block_height, seconds_per_request)
 
 
 if __name__ == '__main__':
@@ -123,11 +138,14 @@ if __name__ == '__main__':
     parser.add_argument("api_bearer_token", help="bearer token for the Twitter v2 API")
     parser.add_argument("tip_tweet_id", help="tweet id of the tip", type=int)
     parser.add_argument("tip_block_height", help="block height of the tip", type=int)
+    parser.add_argument("--stop", help="stop at given block height", type=int)
     args = parser.parse_args()
 
     raw_client = tweepy.Client(args.api_bearer_token, return_type=requests.Response)
     raw_response = raw_client.get_tweet(genesis_block[0])
     seconds_per_request = throttle_for_rate_limit(raw_response)
 
+    sys.setrecursionlimit(max(sys.getrecursionlimit(), args.tip_block_height * 2))
+
     client = tweepy.Client(args.api_bearer_token, wait_on_rate_limit=True)
-    get_stack_blocks(args.tip_tweet_id, args.tip_block_height, seconds_per_request)
+    get_stack_blocks(args.tip_tweet_id, args.tip_block_height, args.stop, seconds_per_request)
