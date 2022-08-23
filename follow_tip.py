@@ -29,12 +29,15 @@ genesis_block = (5, '1549169119924080640')
 # the "block glue" is just a dict that maps from the tweet id from the tweet before the gap to the
 # next available tweet (represented as a tuple of stack height and tweet id)
 # Obviously, the status of tweets might change, so this list may have to be updated
-block_glue = {1554882622634921984: (811, 1554841198011056136), 1552119154035101700: (607, 1552105775723450371),
+block_glue = {1559204667942440960: (1179, 1559197580466192385),  # deleted block 1180 @cornokun
+              1556900393325453312: (962, 1556885645087444993),  # deleted block 988 @cornokun
+              1554882622634921984: (811, 1554841198011056136), 1552119154035101700: (607, 1552105775723450371),
               1551038503722655744: (496, 1551029344369123330), 1550712306715299842: (460, 1550702235335528448),
               1550637885040254979: (440, 1550633990393958401), 1550624214155411457: (436, 1550617394510430209),
               1550544089820631040: (396, 1550541421517897728), 1550541421517897728: (392, 1550533947896913920),
               1550365580279963648: (352, 1550350385348579328), 1550283090387402752: (315, 1550280553638895617),
               1549893708404781056: (213, 1549881546479370241), 1549840113370365955: (193, 1549838019926302721),
+              1549816011574108161: (180, 1549813439664738305),  # deleted block 181 @cornokun
               1549770600079675392: (160, 1549765584929398784), 1549753725903900673: (152, 1549741301230346243),
               1549653584370757637: (138, 1549652638924357634), 1549651198621487104: (135, 1549648850960297984),
               1549640872228265985: (125, 1549638119615475713), 1549625948613509120: (112, 1549623253953433600),
@@ -80,9 +83,10 @@ def print_block_info(tweet_id, author_username, created_at, approx_block_height,
     """Print structured information about given block in .tsv format suitable for easy import into Google Sheets
     :param full_text:
     """
-    print('{:d}\t{:s}\t{:s}\t{:d}\t{:d}\t{:s}\t{:s}\t{:s}\t{:s}'.format(tweet_id, generic_tweet_url(tweet_id), author_username, created_at,
-                                                                  approx_block_height, txt, full_text, str(blocks),
-                                                                  str(mentions)))
+    print('{:d}\t{:s}\t{:s}\t{:d}\t{:d}\t{:s}\t{:s}\t{:s}\t{:s}'.format(tweet_id, generic_tweet_url(tweet_id),
+                                                                        author_username, created_at,
+                                                                        approx_block_height, txt, full_text,
+                                                                        str(blocks), str(mentions)))
 
 
 def get_stack_blocks(tweet_id: int, approx_block_height: int, stop_block_height, seconds_per_request: int):
